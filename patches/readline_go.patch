@@ -1,0 +1,57 @@
+diff --git a/readline/term_zos.go b/readline/term_zos.go
+new file mode 100644
+index 0000000..df81cc9
+--- /dev/null
++++ b/readline/term_zos.go
+@@ -0,0 +1,51 @@
++package readline
++
++import (
++	"golang.org/x/sys/unix"
++)
++
++type Termios=unix.Termios
++
++func getTermios(fd uintptr) (*Termios, error) {
++	termios := new(Termios)
++	term, err := unix.IoctlGetTermios(int(fd), unix.TCGETS)
++	if err != nil {
++		return nil, err
++	}
++	*termios = *term
++	return termios, nil
++}
++
++func setTermios(fd uintptr, termios *Termios) error {
++	if err := unix.IoctlSetTermios(int(fd), unix.TCSETS, termios); err != nil {
++		return err
++	}
++	return nil
++}
++
++func SetRawMode(fd uintptr) (*Termios, error) {
++        termios, err := getTermios(fd)
++        if err != nil {
++                return nil, err
++        }
++
++        newTermios := *termios
++        newTermios.Iflag &^= unix.IGNBRK | unix.BRKINT | unix.PARMRK | unix.ISTRIP | unix.INLCR | unix.IGNCR | unix.ICRNL | unix.IXON
++        newTermios.Lflag &^= unix.ECHO | unix.ECHONL | unix.ICANON | unix.ISIG | unix.IEXTEN
++        newTermios.Cflag &^= unix.CSIZE | unix.PARENB
++        newTermios.Cflag |= unix.CS8
++        newTermios.Cc[unix.VMIN] = 1
++        newTermios.Cc[unix.VTIME] = 0
++
++        return termios, setTermios(fd, &newTermios)
++}
++
++func UnsetRawMode(fd uintptr, termios any) error {
++        t := termios.(*Termios)
++        return setTermios(fd, t)
++}
++
++func IsTerminal(fd uintptr) bool {
++        _, err := getTermios(fd)
++        return err == nil
++}
