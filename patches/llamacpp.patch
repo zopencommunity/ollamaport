@@ -1,0 +1,101 @@
+diff --git a/llama/llama.cpp/common/common.cpp b/llama/llama.cpp/common/common.cpp
+index 2b1d8da..6ff8cae 100644
+--- a/llama/llama.cpp/common/common.cpp
++++ b/llama/llama.cpp/common/common.cpp
+@@ -830,7 +830,7 @@ std::string fs_get_cache_directory() {
+     if (getenv("LLAMA_CACHE")) {
+         cache_directory = std::getenv("LLAMA_CACHE");
+     } else {
+-#if defined(__linux__) || defined(__FreeBSD__) || defined(_AIX)
++#if defined(__linux__) || defined(__FreeBSD__) || defined(_AIX) || defined(__MVS__)
+         if (std::getenv("XDG_CACHE_HOME")) {
+             cache_directory = std::getenv("XDG_CACHE_HOME");
+         } else {
+diff --git a/llama/llama.cpp/common/stb_image.h b/llama/llama.cpp/common/stb_image.h
+index 9eedabe..3d6881c 100644
+--- a/llama/llama.cpp/common/stb_image.h
++++ b/llama/llama.cpp/common/stb_image.h
+@@ -534,6 +534,9 @@ STBIDEF int   stbi_zlib_decode_buffer(char *obuffer, int olen, const char *ibuff
+ STBIDEF char *stbi_zlib_decode_noheader_malloc(const char *buffer, int len, int *outlen);
+ STBIDEF int   stbi_zlib_decode_noheader_buffer(char *obuffer, int olen, const char *ibuffer, int ilen);
+ 
++#ifdef __MVS__
++   #define STBI_NO_THREAD_LOCALS
++#endif
+ 
+ #ifdef __cplusplus
+ }
+@@ -654,6 +657,10 @@ typedef int32_t  stbi__int32;
+ // should produce compiler error if size is wrong
+ typedef unsigned char validate_uint32[sizeof(stbi__uint32)==4 ? 1 : -1];
+ 
++#if defined(__MVS__)
++#include <zos-tls.h>
++#endif
++
+ #ifdef _MSC_VER
+ #define STBI_NOTUSED(v)  (void)(v)
+ #else
+@@ -963,11 +970,33 @@ static int      stbi__pnm_info(stbi__context *s, int *x, int *y, int *comp);
+ static int      stbi__pnm_is16(stbi__context *s);
+ #endif
+ 
++#if defined(__MVS__)
++static __tlssim<const char*> stbi__g_failure_reason_tls("");
++#define stbi__g_failure_reason (*stbi__g_failure_reason_tls.access())
++
++#ifndef STBI_NO_THREAD_LOCALS
++static __tlssim<int> stbi__vertically_flip_on_load_local_tls(0);
++static __tlssim<int> stbi__vertically_flip_on_load_set_tls(0);
++static __tlssim<int> stbi__unpremultiply_on_load_local_tls(0);
++static __tlssim<int> stbi__unpremultiply_on_load_set_tls(0);
++static __tlssim<int> stbi__de_iphone_flag_local_tls(0);
++static __tlssim<int> stbi__de_iphone_flag_set_tls(0);
++
++#define stbi__vertically_flip_on_load_local (*stbi__vertically_flip_on_load_local_tls.access())
++#define stbi__vertically_flip_on_load_set (*stbi__vertically_flip_on_load_set_tls.access())
++#define stbi__unpremultiply_on_load_local (*stbi__unpremultiply_on_load_local_tls.access())
++#define stbi__unpremultiply_on_load_set (*stbi__unpremultiply_on_load_set_tls.access())
++#define stbi__de_iphone_flag_local (*stbi__de_iphone_flag_local_tls.access())
++#define stbi__de_iphone_flag_set (*stbi__de_iphone_flag_set_tls.access())
++#endif
++
++#else
+ static
+ #ifdef STBI_THREAD_LOCAL
+ STBI_THREAD_LOCAL
+ #endif
+ const char *stbi__g_failure_reason;
++#endif
+ 
+ STBIDEF const char *stbi_failure_reason(void)
+ {
+diff --git a/llama/llama.cpp/src/llama-context.cpp b/llama/llama.cpp/src/llama-context.cpp
+index 1f3a395..73ddf8b 100644
+--- a/llama/llama.cpp/src/llama-context.cpp
++++ b/llama/llama.cpp/src/llama-context.cpp
+@@ -1117,7 +1117,10 @@ int llama_context::decode(llama_batch & inp_batch) {
+                     }
+                 }
+             }
+-            std::fill(output_ids.begin(), output_ids.end(), -1);
++            //std::fill(output_ids.begin(), output_ids.end(), -1);
++	    for (auto& id : output_ids) {
++                id = -1;
++            }
+             for (int32_t i = 0; i < n_outputs; ++i) {
+                 output_ids[out_ids[i]] = i;
+             }
+@@ -1207,8 +1210,10 @@ int32_t llama_context::output_reserve(int32_t n_outputs) {
+     embd   = has_embd   ? output_base + logits_size : nullptr;
+ 
+     // set all ids as invalid (negative)
+-    std::fill(output_ids.begin(), output_ids.end(), -1);
+-
++    // std::fill(output_ids.begin(), output_ids.end(), -1);
++    for (auto& id : output_ids) {
++        id = -1;
++    }
+     this->n_outputs     = 0;
+     this->n_outputs_max = n_outputs_max;
+ 

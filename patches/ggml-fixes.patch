@@ -1,3 +1,34 @@
+diff --git a/ml/backend/ggml/ggml.go b/ml/backend/ggml/ggml.go
+index 707b739..b2075c6 100644
+--- a/ml/backend/ggml/ggml.go
++++ b/ml/backend/ggml/ggml.go
+@@ -258,7 +258,7 @@ func New(modelPath string, params ml.BackendParams) (ml.Backend, error) {
+ 				return tt
+ 			}
+ 
+-			tt := C.ggml_new_tensor(ctxs[bt], t.source.Kind, C.int(len(t.source.Shape)), (*C.int64_t)(unsafe.Pointer(&t.source.Shape[0])))
++			tt := C.ggml_new_tensor(ctxs[bt], C.enum_ggml_type(t.source.Kind), C.int(len(t.source.Shape)), (*C.int64_t)(unsafe.Pointer(&t.source.Shape[0])))
+ 			C.ggml_set_name(tt, cname)
+ 
+ 			slog.Log(context.TODO(), logutil.LevelTrace, "created tensor", "name", name, "shape", t.source.Shape, "dtype", t.source.Kind, "buffer_type", C.GoString(C.ggml_backend_buft_name(bt)))
+@@ -694,7 +694,7 @@ func (c *Context) newTensor(dtype ml.DType, shape []int) ml.Tensor {
+ 
+ 	if len(shape) < 1 || shape[0] == 0 {
+ 		var shape C.int64_t = 0
+-		return &Tensor{b: c.b, t: C.ggml_new_tensor(c.ctx, cdtype, 1, &shape)}
++		return &Tensor{b: c.b, t: C.ggml_new_tensor(c.ctx, C.enum_ggml_type(cdtype), 1, &shape)}
+ 	} else if len(shape) > 4 {
+ 		panic("unsupported number of dimensions")
+ 	}
+@@ -705,7 +705,7 @@ func (c *Context) newTensor(dtype ml.DType, shape []int) ml.Tensor {
+ 		}
+ 	}
+ 
+-	t := C.ggml_new_tensor(c.ctx, cdtype, C.int(len(shape)), shapeToGGML(shape))
++	t := C.ggml_new_tensor(c.ctx, C.enum_ggml_type(cdtype), C.int(len(shape)), shapeToGGML(shape))
+ 	size := pad(C.ggml_backend_buft_get_alloc_size(c.buft, t), C.ggml_backend_buft_get_alignment(c.buft))
+ 
+ 	b := C.ggml_backend_buft_alloc_buffer(c.buft, size)
 diff --git a/ml/backend/ggml/ggml/src/ggml-cpu/ggml-cpu.c b/ml/backend/ggml/ggml/src/ggml-cpu/ggml-cpu.c
 index 2462d2b..566f153 100644
 --- a/ml/backend/ggml/ggml/src/ggml-cpu/ggml-cpu.c
@@ -77,3 +108,19 @@ index 8a65462..258878d 100644
  #include <alloca.h>
  #endif
  
+diff --git a/ml/backend/ggml/quantization.go b/ml/backend/ggml/quantization.go
+index bb31e45..3f2f999 100644
+--- a/ml/backend/ggml/quantization.go
++++ b/ml/backend/ggml/quantization.go
+@@ -65,9 +65,9 @@ func Quantize(newType fsggml.TensorType, f32s []float32, shape []uint64) []byte
+ 	newSize := C.size_t(0)
+ 	for i03 := C.int64_t(0); i03 < shape2; i03++ {
+ 		f32s_03 := i03 * nelements_matrix
+-		buf_03 := C.int64_t(C.ggml_row_size(uint32(newType), nPerRow)) * i03 * nrows
++		buf_03 := C.int64_t(C.ggml_row_size(C.enum_ggml_type(newType), nPerRow)) * i03 * nrows
+ 		newSize += C.ggml_quantize_chunk(
+-			uint32(newType),
++			C.enum_ggml_type(newType),
+ 			(*C.float)(&f32s[f32s_03]),
+ 			unsafe.Pointer((uintptr)(unsafe.Pointer(&buf[0]))+uintptr(buf_03)),
+ 			0,

@@ -1,6 +1,6 @@
 # Update bump details accordingly. Use bump check to confirm.
 # bump: ollama-version /OLLAMA_VERSION="(.*)"/ https://github.com/ollama/ollama.git|semver:*
-OLLAMA_VERSION="0.9.2" # Specify a stable release
+OLLAMA_VERSION="0.9.6" # Specify a stable release
 export ZOPEN_STABLE_TAG="v${OLLAMA_VERSION}"
 
 ###
@@ -16,7 +16,7 @@ export ZOPEN_BUILD_LINE="STABLE"
 
 ## Required IF ZOPEN_BUILD_LINE='STABLE'
 export ZOPEN_STABLE_URL="https://github.com/ollama/ollama.git"  # Specify the stable build URL (either git or tarball)
-export ZOPEN_STABLE_DEPS="cmake make check_clang check_go wharf" # Specify the stable build dependencies.
+export ZOPEN_STABLE_DEPS="cmake make check_clang comp_clang check_go wharf" # Specify the stable build dependencies.
 
 ## Required IF ZOPEN_BUILD_LINE='DEV'
 export ZOPEN_DEV_URL=""   # Specify the dev build URL
@@ -40,7 +40,7 @@ export ZOPEN_COMP="GO"
 
 #export ZOPEN_BOOTSTRAP="skip" ## Bootstrap program to run (defaults to './bootstrap')
 #export ZOPEN_CHECK="skip"     ## Check program to run (defaults to 'make')
-export ZOPEN_CONFIGURE="skip" ## Configuration program to run (defaults to './configure')
+export ZOPEN_CONFIGURE="zopen_wharf" ## Configuration program to run (defaults to './configure')
 export ZOPEN_INSTALL="skip"   ## Installation program to run (defaults to 'make')
 export ZOPEN_MAKE="zopen_build"      ## Build program to run (defaults to 'make')
 export ZOPEN_CLEAN="zopen_clean"         ## Clean up program to run (defaults to 'make')
@@ -77,7 +77,7 @@ zopen_get_version()
 
 zopen_build()
 {
-  go build -x -v .
+  CGO_CXXFLAGS="$CGO_CXXFLAGS $CXXFLAGS" CGO_ENABLED=1  go build -x -v .
 }
 
 zopen_wharf()
@@ -116,19 +116,12 @@ zopen_wharf()
 #}
 
 zopen_init() {
-  set -x
   export CGO_ENABLED=1
   export GOTMPDIR=$PWD/go-tmpdir
   mkdir -p $PWD/go-tmpdir
   export PATH=$PATH:$GOROOT/go-build-zos/bin
   export GOBIN=$ZOPEN_INSTALL_DIR/bin
   mkdir -p $ZOPEN_INSTALL_DIR/bin
-  unset CC CXX
-  export CGO_CXX=clang++
-  export CGO_CC=clang
-  env
-  go env
-  set +x
 }
 
 #zopen_post_buildenv(){
