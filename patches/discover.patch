@@ -1,0 +1,252 @@
+diff --git a/discover/gpu_info.h b/discover/gpu_info.h
+index ee7ff4c..759bd31 100644
+--- a/discover/gpu_info.h
++++ b/discover/gpu_info.h
+@@ -1,4 +1,4 @@
+-#ifndef __APPLE__
++#if !defined(__APPLE__) && !defined(__MVS__)
+ #ifndef __GPU_INFO_H__
+ #define __GPU_INFO_H__
+ #include <stdint.h>
+diff --git a/discover/gpu_info_cudart.c b/discover/gpu_info_cudart.c
+index bc5115b..6bcdd2d 100644
+--- a/discover/gpu_info_cudart.c
++++ b/discover/gpu_info_cudart.c
+@@ -1,4 +1,4 @@
+-#ifndef __APPLE__  // TODO - maybe consider nvidia support on intel macs?
++#if !defined(__APPLE__)  && !defined(__MVS__) // TODO - maybe consider nvidia support on intel macs?
+ 
+ #include <string.h>
+ #include <inttypes.h>
+diff --git a/discover/gpu_info_cudart.h b/discover/gpu_info_cudart.h
+index ff0c0af..75c7652 100644
+--- a/discover/gpu_info_cudart.h
++++ b/discover/gpu_info_cudart.h
+@@ -1,4 +1,4 @@
+-#ifndef __APPLE__
++#if !defined(__APPLE__) && !defined(__MVS__)
+ #ifndef __GPU_INFO_CUDART_H__
+ #define __GPU_INFO_CUDART_H__
+ #include "gpu_info.h"
+diff --git a/discover/gpu_info_nvcuda.c b/discover/gpu_info_nvcuda.c
+index d2d0b68..ed51c70 100644
+--- a/discover/gpu_info_nvcuda.c
++++ b/discover/gpu_info_nvcuda.c
+@@ -1,4 +1,4 @@
+-#ifndef __APPLE__  // TODO - maybe consider nvidia support on intel macs?
++#if !defined(__APPLE__) && !defined(__MVS__) // TODO - maybe consider nvidia support on intel macs?
+ 
+ #include <string.h>
+ #include <inttypes.h>
+diff --git a/discover/gpu_info_nvcuda.h b/discover/gpu_info_nvcuda.h
+index ef2fe8a..efee82c 100644
+--- a/discover/gpu_info_nvcuda.h
++++ b/discover/gpu_info_nvcuda.h
+@@ -1,4 +1,4 @@
+-#ifndef __APPLE__
++#if !defined(__APPLE__) && !defined(__MVS__)
+ #ifndef __GPU_INFO_NVCUDA_H__
+ #define __GPU_INFO_NVCUDA_H__
+ #include "gpu_info.h"
+diff --git a/discover/gpu_info_nvml.c b/discover/gpu_info_nvml.c
+index 342a3aa..3b5afdc 100644
+--- a/discover/gpu_info_nvml.c
++++ b/discover/gpu_info_nvml.c
+@@ -1,4 +1,4 @@
+-#ifndef __APPLE__  // TODO - maybe consider nvidia support on intel macs?
++#if !defined(__APPLE__) && !defined(__MVS__) // TODO - maybe consider nvidia support on intel macs?
+ 
+ #include <string.h>
+ 
+@@ -101,4 +101,4 @@ void nvml_release(nvml_handle_t h) {
+   h.handle = NULL;
+ }
+ 
+-#endif  // __APPLE__
+\ No newline at end of file
++#endif  // __APPLE__
+diff --git a/discover/gpu_info_nvml.h b/discover/gpu_info_nvml.h
+index 9088023..759105b 100644
+--- a/discover/gpu_info_nvml.h
++++ b/discover/gpu_info_nvml.h
+@@ -1,4 +1,4 @@
+-#ifndef __APPLE__
++#if  !defined(__APPLE__) && !defined(__MVS__)
+ #ifndef __GPU_INFO_NVML_H__
+ #define __GPU_INFO_NVML_H__
+ #include "gpu_info.h"
+@@ -45,4 +45,4 @@ void nvml_get_free(nvml_handle_t ch, char *uuid, uint64_t *free, uint64_t *total
+ void nvml_release(nvml_handle_t ch);
+ 
+ #endif  // __GPU_INFO_NVML_H__
+-#endif  // __APPLE__
+\ No newline at end of file
++#endif  // __APPLE__
+diff --git a/discover/gpu_info_oneapi.c b/discover/gpu_info_oneapi.c
+index 3ff708e..c66b197 100644
+--- a/discover/gpu_info_oneapi.c
++++ b/discover/gpu_info_oneapi.c
+@@ -1,4 +1,4 @@
+-#ifndef __APPLE__
++#if !defined(__APPLE__) && !defined(__MVS__)
+ 
+ #include "gpu_info_oneapi.h"
+ 
+diff --git a/discover/gpu_info_oneapi.h b/discover/gpu_info_oneapi.h
+index 97fcecd..6b5e290 100644
+--- a/discover/gpu_info_oneapi.h
++++ b/discover/gpu_info_oneapi.h
+@@ -1,4 +1,4 @@
+-#ifndef __APPLE__
++#if !defined(__APPLE__) && !defined(__MVS__)
+ #ifndef __GPU_INFO_ONEAPI_H__
+ #define __GPU_INFO_ONEAPI_H__
+ #include "gpu_info.h"
+diff --git a/discover/gpu_info_zos.c b/discover/gpu_info_zos.c
+new file mode 100644
+index 0000000..9b1e988
+--- /dev/null
++++ b/discover/gpu_info_zos.c
+@@ -0,0 +1,33 @@
++#include "gpu_info_zos.h"
++
++#define CVT_PTR        0x10
++#define CVTRCEP_OFFSET         0x490
++#define RCEAFC_OFFSET  0x088
++
++typedef unsigned data_area_ptr_assign_type;
++
++typedef union {
++    struct {
++#if defined(_LP64)
++        data_area_ptr_assign_type lower;
++#endif
++       data_area_ptr_assign_type assign;
++    };
++    char* deref;
++} data_area_ptr;
++
++uint64_t get_free_memory(void) {
++    uint64_t freeram;
++    data_area_ptr cvt = {0};
++    data_area_ptr rcep = {0};
++    cvt.assign = *(data_area_ptr_assign_type*)(CVT_PTR);
++    rcep.assign = *(data_area_ptr_assign_type*)(cvt.deref + CVTRCEP_OFFSET);
++    freeram = (uint64_t)*((uint32_t*)(rcep.deref + RCEAFC_OFFSET)) * 4096;
++
++    return freeram;
++}
++
++uint64_t get_total_memory(void) {
++    /* Use CVTRLSTG to get the size of actual real storage online at IPL in K. */
++    return (uint64_t)((int)((char *__ptr32 *__ptr32 *)0)[4][214]) * 1024;
++}
+diff --git a/discover/gpu_info_zos.h b/discover/gpu_info_zos.h
+new file mode 100644
+index 0000000..41b83c0
+--- /dev/null
++++ b/discover/gpu_info_zos.h
+@@ -0,0 +1,5 @@
++#include <stdint.h>
++uint64_t get_total_memory();
++//uint64_t getPhysicalMemory();
++uint64_t get_free_memory();
++
+diff --git a/discover/gpu_zos.go b/discover/gpu_zos.go
+new file mode 100644
+index 0000000..8a41c8a
+--- /dev/null
++++ b/discover/gpu_zos.go
+@@ -0,0 +1,79 @@
++package discover
++/*
++#cgo linux LDFLAGS: -lrt -lpthread -ldl -lstdc++ -lm
++#cgo windows LDFLAGS: -lpthread
++
++#include "gpu_info_zos.h"
++*/
++import "C"
++
++import (
++//        "os"
++//	"log/slog"
++        "runtime"
++//        "syscall"
++)
++
++func (l GpuInfoList) GetVisibleDevicesEnv() (string, string) {
++        return "", ""
++}
++
++func GetCPUMem() (memInfo, error) {
++        return memInfo{
++                TotalMemory: uint64(C.get_total_memory()),
++                FreeMemory:  uint64(C.get_free_memory()),
++        }, nil
++}
++
++func GetCPUInfo() GpuInfoList {
++        mem, _ := GetCPUMem()
++        return []GpuInfo{
++                {
++                        Library: "cpu",
++                        memInfo: mem,
++                },
++        }
++}
++
++func GetGPUInfo() GpuInfoList {
++        mem, _ := GetCPUMem()
++        if runtime.GOARCH == "amd64" {
++                return []GpuInfo{
++                        {
++                                Library: "cpu",
++                                memInfo: mem,
++                        },
++                }
++        }
++        info := GpuInfo{
++                Library: "metal",
++                ID:      "0",
++        }
++//        info.TotalMemory = uint64(C.getRecommendedMaxVRAM())
++
++        // TODO is there a way to gather actual allocated video memory? (currentAllocatedSize doesn't work)
++        info.FreeMemory = info.TotalMemory
++
++//        info.MinimumMemory = metalMinimumMemory
++        return []GpuInfo{info}
++}
++
++func GetSystemInfo() SystemInfo {
++        mem, _ := GetCPUMem()
++
++        return SystemInfo{
++                System: CPUInfo{
++                        GpuInfo: GpuInfo{
++                                memInfo: mem,
++                        },
++                        CPUs: []CPU{
++                                {
++                                        CoreCount:           int(1),
++                                        EfficiencyCoreCount: int(0),
++                                        ThreadCount:         int(1),
++                                },
++                        },
++                },
++                GPUs: GetGPUInfo(),
++        }
++}
+diff --git a/llm/llm_zos.go b/llm/llm_zos.go
+new file mode 100644
+index 0000000..60837ed
+--- /dev/null
++++ b/llm/llm_zos.go
+@@ -0,0 +1,7 @@
++package llm
++
++import (
++	"syscall"
++)
++
++var LlamaServerSysProcAttr = &syscall.SysProcAttr{}
